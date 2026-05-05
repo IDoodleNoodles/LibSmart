@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { register } from '@/services/api';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ export default function Register() {
     agreeToTerms: false,
   });
   const [passwordError, setPasswordError] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, type, value, checked } = e.target;
@@ -22,7 +25,6 @@ export default function Register() {
       [name]: type === 'checkbox' ? checked : value,
     }));
 
-    // Check password match
     if (name === 'password' || name === 'confirmPassword') {
       if (value && formData.password !== formData.confirmPassword) {
         setPasswordError('Passwords do not match');
@@ -30,14 +32,16 @@ export default function Register() {
         setPasswordError('');
       }
     }
+    setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     
     // Validation
     if (!formData.fullName || !formData.email || !formData.username || !formData.password || !formData.confirmPassword) {
-      alert('Please fill in all fields');
+      setError('Please fill in all fields');
       return;
     }
 
@@ -47,12 +51,26 @@ export default function Register() {
     }
 
     if (!formData.agreeToTerms) {
-      alert('Please agree to the Terms of Service');
+      setError('Please agree to the Terms of Service');
       return;
     }
 
-    // Mock registration - in a real app, this would call an API
-    navigate('/login');
+    setLoading(true);
+
+    try {
+      await register({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+      });
+
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,6 +91,13 @@ export default function Register() {
             <h2 className="text-2xl font-bold text-black mb-2">Create Account</h2>
             <p className="text-libsmart-slate">Join LibSmart today</p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -206,9 +231,10 @@ export default function Register() {
             {/* Create Account Button */}
             <Button
               type="submit"
-              className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90 text-white font-semibold py-2.5 rounded-lg transition-all"
+              disabled={loading}
+              className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90 text-white font-semibold py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              CREATE ACCOUNT
+              {loading ? 'CREATING ACCOUNT...' : 'CREATE ACCOUNT'}
             </Button>
           </form>
 

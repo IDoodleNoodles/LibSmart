@@ -1,18 +1,8 @@
-export const defaultUserName = 'sarah.mitchell';
+export const defaultUserName = 'member';
 
 export const mockAdminProfile = {
   fullName: 'Nisal Gunasekara',
   role: 'Admin',
-};
-
-export const mockUserProfile = {
-  username: defaultUserName,
-  fullName: 'Sarah Mitchell',
-  email: 'sarah.mitchell@example.com',
-  phone: '(555) 123-4567',
-  address: '123 Main Street, Springfield, IL 62701',
-  membershipDate: 'October 15, 2023',
-  membershipId: 'LIB-2024-001847',
 };
 
 export const dashboardStats = [
@@ -24,7 +14,7 @@ export const dashboardStats = [
 
 export const dashboardOverdueBorrowers = [
   { id: 'ORD-001', userName: 'John Smith', bookTitle: 'The Great Gatsby', daysOverdue: 5 },
-  { id: 'ORD-002', userName: 'Sarah Johnson', bookTitle: '1984', daysOverdue: 3 },
+  { id: 'ORD-002', userName: 'Maya Johnson', bookTitle: '1984', daysOverdue: 3 },
   { id: 'ORD-003', userName: 'Mike Davis', bookTitle: 'To Kill a Mockingbird', daysOverdue: 8 },
   { id: 'ORD-004', userName: 'Emma Wilson', bookTitle: 'Pride and Prejudice', daysOverdue: 2 },
 ];
@@ -45,7 +35,7 @@ export const dashboardBooks = [
 
 export const dashboardUsers = [
   { id: 'US-001', name: 'John Smith', email: 'john@example.com', username: 'johnsmith', action: 'View' },
-  { id: 'US-002', name: 'Sarah Johnson', email: 'sarah@example.com', username: 'sarahj', action: 'View' },
+  { id: 'US-002', name: 'Maya Johnson', email: 'maya@example.com', username: 'mayaj', action: 'View' },
   { id: 'US-003', name: 'Mike Davis', email: 'mike@example.com', username: 'miked', action: 'View' },
   { id: 'US-004', name: 'Emma Wilson', email: 'emma@example.com', username: 'emmaw', action: 'View' },
 ];
@@ -78,7 +68,7 @@ export const userAccounts: Array<{
   joinDate: string;
 }> = [
   { id: 'US-001', name: 'John Smith', email: 'john@example.com', role: 'Member', status: 'Active', joinDate: 'Jan 15, 2024' },
-  { id: 'US-002', name: 'Sarah Johnson', email: 'sarah@example.com', role: 'Member', status: 'Active', joinDate: 'Feb 22, 2024' },
+  { id: 'US-002', name: 'Maya Johnson', email: 'maya@example.com', role: 'Member', status: 'Active', joinDate: 'Feb 22, 2024' },
   { id: 'US-003', name: 'Mike Davis', email: 'mike@example.com', role: 'Librarian', status: 'Active', joinDate: 'Mar 10, 2024' },
   { id: 'US-004', name: 'Emma Wilson', email: 'emma@example.com', role: 'Member', status: 'Inactive', joinDate: 'Jan 05, 2024' },
   { id: 'US-005', name: 'James Brown', email: 'james@example.com', role: 'Admin', status: 'Active', joinDate: 'Dec 01, 2023' },
@@ -95,7 +85,7 @@ export const branchRecords: Array<{
   employees: number;
 }> = [
   { id: 'BR-001', name: 'Downtown Branch', location: 'Main Street', contact: '123-456-7890', manager: 'John Smith', status: 'Active', employees: 8 },
-  { id: 'BR-002', name: 'Uptown Branch', location: 'Park Avenue', contact: '123-456-7891', manager: 'Sarah Johnson', status: 'Active', employees: 6 },
+  { id: 'BR-002', name: 'Uptown Branch', location: 'Park Avenue', contact: '123-456-7891', manager: 'Maya Johnson', status: 'Active', employees: 6 },
   { id: 'BR-003', name: 'Westside Branch', location: 'West Road', contact: '123-456-7892', manager: 'Mike Davis', status: 'Inactive', employees: 4 },
   { id: 'BR-004', name: 'Eastside Branch', location: 'East Lane', contact: '123-456-7893', manager: 'Emma Wilson', status: 'Active', employees: 5 },
   { id: 'BR-005', name: 'Riverside Branch', location: 'River Street', contact: '123-456-7894', manager: 'James Brown', status: 'Active', employees: 7 },

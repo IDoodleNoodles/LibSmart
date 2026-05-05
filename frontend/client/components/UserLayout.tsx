@@ -1,7 +1,7 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { Search, LogOut, Home, BookOpen, History, User as UserIcon } from 'lucide-react';
-import { defaultUserName, mockUserProfile } from '../lib/mockData';
+import { getProfile } from '../services/api';
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -15,10 +15,26 @@ const navItems = [
 export default function UserLayout({ children }: UserLayoutProps) {
   const location = useLocation();
   const { username } = useParams();
-  const dashboardPath = `/${username ?? defaultUserName}/dashboard`;
-  const browsePath = `/${username ?? defaultUserName}/browse`;
-  const myBooksPath = `/${username ?? defaultUserName}/my-books`;
-  const profilePath = `/${username ?? defaultUserName}/profile`;
+  const [profile, setProfile] = useState({ fullName: 'Loading...', username: username || 'user' });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await getProfile();
+        setProfile(data);
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  const basePath = `/${username || profile.username}`;
+  const dashboardPath = `${basePath}/dashboard`;
+  const browsePath = `${basePath}/browse`;
+  const myBooksPath = `${basePath}/my-books`;
+  const profilePath = `${basePath}/profile`;
+  
   const currentTime = new Date();
   const formattedTime = currentTime.toLocaleTimeString('en-US', { 
     hour: '2-digit', 
@@ -98,11 +114,15 @@ export default function UserLayout({ children }: UserLayoutProps) {
         {/* User Profile Section */}
         <div className="p-4 border-t border-libsmart-slate/20">
           <div className="mb-4 pb-4 border-b border-libsmart-slate/20">
-            <p className="font-semibold text-black text-sm">{mockUserProfile.fullName}</p>
+            <p className="font-semibold text-black text-sm">{profile.fullName}</p>
             <p className="text-xs text-libsmart-slate">Member</p>
           </div>
           <Link
             to="/welcome"
+            onClick={() => {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+            }}
             className="flex w-full items-center gap-2 rounded-md px-4 py-2.5 text-sm text-libsmart-slate transition-colors hover:bg-libsmart-slate/10 hover:text-libsmart-slate"
           >
             <LogOut size={18} />

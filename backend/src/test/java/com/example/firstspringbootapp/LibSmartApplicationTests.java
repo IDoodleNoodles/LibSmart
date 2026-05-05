@@ -1,13 +1,12 @@
-package com.example.libsmart.backend;
+package com.example.firstspringbootapp;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class BackendApplicationTests {
+@SpringBootTest(classes = LibSmartApplication.class)
+class LibSmartApplicationTests {
 
 	@Test
 	void contextLoads() {
 	}
-
 }
