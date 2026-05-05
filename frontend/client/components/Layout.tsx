@@ -1,7 +1,7 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Users, MapPin, LogOut } from 'lucide-react';
-import { mockAdminProfile } from '../lib/mockData';
+import { getProfile } from '../services/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +17,20 @@ const navItems = [
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const [profile, setProfile] = useState({ fullName: 'Loading...', role: 'ADMIN' });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const data = await getProfile();
+        setProfile(data);
+      } catch (error) {
+        console.error('Failed to fetch profile:', error);
+      }
+    };
+    fetchProfile();
+  }, []);
+
   const currentTime = new Date();
   const formattedTime = currentTime.toLocaleTimeString('en-US', { 
     hour: '2-digit', 
@@ -69,11 +83,15 @@ export default function Layout({ children }: LayoutProps) {
         {/* User Profile Section */}
         <div className="p-4 border-t border-libsmart-slate/20">
           <div className="mb-4 pb-4 border-b border-libsmart-slate/20">
-            <p className="font-semibold text-black text-sm">{mockAdminProfile.fullName}</p>
-            <p className="text-xs text-libsmart-slate">{mockAdminProfile.role}</p>
+            <p className="font-semibold text-black text-sm">{profile.fullName}</p>
+            <p className="text-xs text-libsmart-slate">{profile.role}</p>
           </div>
           <Link
             to="/welcome"
+            onClick={() => {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('auth_user');
+            }}
             className="flex w-full items-center gap-2 rounded-md px-4 py-2.5 text-sm text-libsmart-slate transition-colors hover:bg-libsmart-slate/10 hover:text-libsmart-slate"
           >
             <LogOut size={18} />

@@ -13,6 +13,13 @@ interface Catalog {
   status: 'Active' | 'Inactive';
 }
 
+interface CatalogFormData {
+  title: string;
+  description: string;
+  bookCount: number;
+  status: 'Active' | 'Inactive';
+}
+
 export default function Catalog() {
   const [catalogs, setCatalogs] = useState<Catalog[]>([
     { id: 'CAT-001', title: 'Fiction Collection', description: 'All novels and fiction books', bookCount: 342, status: 'Active' },
@@ -27,7 +34,7 @@ export default function Catalog() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedCatalog, setSelectedCatalog] = useState<Catalog | null>(null);
-  const [formData, setFormData] = useState({ title: '', description: '', bookCount: 0, status: 'Active' as const });
+  const [formData, setFormData] = useState<CatalogFormData>({ title: '', description: '', bookCount: 0, status: 'Active' });
 
   const openAddModal = () => {
     setFormData({ title: '', description: '', bookCount: 0, status: 'Active' });

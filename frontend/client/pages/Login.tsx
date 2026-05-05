@@ -2,13 +2,16 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mail, Lock } from 'lucide-react';
+import { login, setAuthToken, setAuthUser } from '@/services/api';
 
 export default function Login() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    username: '',
+    identifier: '',
     password: '',
   });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -16,13 +19,33 @@ export default function Login() {
       ...prev,
       [name]: value,
     }));
+    setError('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication - in a real app, this would call an API
-    if (formData.username && formData.password) {
-      navigate('/admin/dashboard');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await login({
+        identifier: formData.identifier,
+        password: formData.password,
+      });
+
+      setAuthToken(response.token);
+      setAuthUser(response.user);
+
+      // Redirect based on role
+      if (response.role === 'ADMIN') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate(`/${response.user.username}/dashboard`);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -45,23 +68,31 @@ export default function Login() {
             <p className="text-libsmart-slate">Sign in to your account to continue</p>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Username Field */}
             <div className="space-y-2">
-              <label htmlFor="username" className="block text-sm font-medium text-black">
+              <label htmlFor="identifier" className="block text-sm font-medium text-black">
                 Username or Email
               </label>
               <div className="relative">
                 <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-libsmart-slate/50" />
                 <input
                   type="text"
-                  id="username"
-                  name="username"
-                  value={formData.username}
+                  id="identifier"
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
                   placeholder="Enter your username or email"
                   className="w-full pl-10 pr-4 py-2.5 border border-libsmart-slate/20 rounded-lg bg-white text-black placeholder-libsmart-slate/50 focus:outline-none focus:ring-2 focus:ring-libsmart-blue focus:border-transparent transition-all"
+                  required
                 />
               </div>
             </div>
@@ -81,6 +112,7 @@ export default function Login() {
                   onChange={handleChange}
                   placeholder="Enter your password"
                   className="w-full pl-10 pr-4 py-2.5 border border-libsmart-slate/20 rounded-lg bg-white text-black placeholder-libsmart-slate/50 focus:outline-none focus:ring-2 focus:ring-libsmart-blue focus:border-transparent transition-all"
+                  required
                 />
               </div>
             </div>
@@ -98,9 +130,10 @@ export default function Login() {
             {/* Sign In Button */}
             <Button
               type="submit"
-              className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90 text-white font-semibold py-2.5 rounded-lg transition-all"
+              disabled={loading}
+              className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90 text-white font-semibold py-2.5 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              SIGN IN
+              {loading ? 'SIGNING IN...' : 'SIGN IN'}
             </Button>
           </form>
 

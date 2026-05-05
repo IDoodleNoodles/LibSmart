@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, Pencil, Trash2, Plus, Shield, User, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import FormModal from '@/components/Modals/FormModal';
 import ConfirmModal from '@/components/Modals/ConfirmModal';
 import ViewModal from '@/components/Modals/ViewModal';
-import { userAccounts } from '../lib/mockData';
+import { getAllUsers } from '../services/api';
 
 interface UserData {
   id: string;
@@ -17,7 +17,30 @@ interface UserData {
 
 export default function Users() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [users, setUsers] = useState<UserData[]>(userAccounts);
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const data = await getAllUsers();
+        const transformedUsers: UserData[] = data.map((user: any) => ({
+          id: user.id?.toString() || '',
+          name: user.fullName || '',
+          email: user.email || '',
+          role: user.role === 'ADMIN' ? 'Admin' : 'Member',
+          status: 'Active',
+          joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' }) : '',
+        }));
+        setUsers(transformedUsers);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

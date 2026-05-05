@@ -3,11 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Check, Lock } from 'lucide-react';
 import { defaultUserName } from '../lib/mockData';
+import { getAuthUser, changePassword } from '../services/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ChangePassword() {
   const navigate = useNavigate();
   const { username } = useParams();
-  const profilePath = `/${username ?? defaultUserName}/profile`;
+  const authUser = getAuthUser() as { username?: string } | null;
+  const profilePath = `/${username ?? authUser?.username ?? defaultUserName}/profile`;
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -51,11 +54,14 @@ export default function ChangePassword() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      alert('Please fill in all fields');
+      toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill in all fields' });
       return;
     }
 
@@ -64,8 +70,16 @@ export default function ChangePassword() {
       return;
     }
 
-    // Mock password change - in a real app, this would call an API
-    navigate(profilePath);
+    setIsSaving(true);
+    try {
+      await changePassword({ currentPassword: formData.currentPassword, newPassword: formData.newPassword });
+      toast({ title: 'Password changed', description: 'Your password has been updated.' });
+      navigate(profilePath);
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Unable to change password', description: err instanceof Error ? err.message : 'Please try again later.' });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const strengthColor = {

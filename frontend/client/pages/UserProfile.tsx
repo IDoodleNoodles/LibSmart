@@ -1,21 +1,98 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Edit2, Save, X } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Edit2, Save, X, KeyRound, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { defaultUserName, mockUserProfile } from '../lib/mockData';
+import { defaultUserName } from '../lib/mockData';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getAuthUser, getMembershipInfo, getProfile, getProfilePhoto, updateProfile, uploadProfilePhoto } from '../services/api';
+import { useToast } from '@/hooks/use-toast';
+
+type ProfileState = {
+  fullName: string;
+  username: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string | null;
+};
 
 export default function UserProfile() {
   const { username } = useParams();
+  const authUser = getAuthUser() as { fullName?: string; username?: string; email?: string; createdAt?: string } | null;
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    fullName: mockUserProfile.fullName,
-    username: username ?? defaultUserName,
-    email: mockUserProfile.email,
-    phone: mockUserProfile.phone,
-    address: mockUserProfile.address,
-    membershipDate: mockUserProfile.membershipDate,
-    membershipId: mockUserProfile.membershipId,
+  const [isLoadingMembership, setIsLoadingMembership] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [membershipId, setMembershipId] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [formData, setFormData] = useState<ProfileState>({
+    fullName: authUser?.fullName || 'Library Member',
+    username: username ?? authUser?.username ?? defaultUserName,
+    email: authUser?.email || 'member@libsmart.com',
+    phone: '',
+    address: '',
+    createdAt: authUser?.createdAt ?? null,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    let currentPhotoUrl: string | null = null;
+
+    const loadProfile = async () => {
+      try {
+        const profile = await getProfile();
+
+        if (cancelled) {
+          return;
+        }
+
+        setFormData({
+          fullName: profile.fullName || 'Library Member',
+          username: profile.username || username || defaultUserName,
+          email: profile.email || 'member@libsmart.com',
+          phone: profile.phone || '',
+          address: profile.address || '',
+          createdAt: profile.createdAt || authUser?.createdAt || null,
+        });
+
+        if (profile.createdAt) {
+          // keep the current real photo in sync when the page loads
+          try {
+            const photoBlob = await getProfilePhoto();
+            if (!cancelled) {
+              currentPhotoUrl = URL.createObjectURL(photoBlob);
+              setPhotoUrl(currentPhotoUrl);
+            }
+          } catch {
+            if (!cancelled) {
+              setPhotoUrl(null);
+            }
+          }
+        }
+      } catch {
+        if (!cancelled && authUser) {
+          setFormData({
+            fullName: authUser.fullName || 'Library Member',
+            username: username || authUser.username || defaultUserName,
+            email: authUser.email || 'member@libsmart.com',
+            phone: '',
+            address: '',
+            createdAt: authUser.createdAt || null,
+          });
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+      if (currentPhotoUrl) {
+        URL.revokeObjectURL(currentPhotoUrl);
+      }
+    };
+  }, [authUser?.createdAt, authUser?.email, authUser?.fullName, authUser?.username, username]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,8 +103,108 @@ export default function UserProfile() {
   };
 
   const handleSave = () => {
-    setIsEditing(false);
+    const persistProfile = async () => {
+      try {
+        const updated = await updateProfile({
+          username: formData.username,
+          email: formData.email,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          address: formData.address,
+        });
+
+        setFormData(prev => ({
+          ...prev,
+          fullName: updated.fullName,
+          username: updated.username,
+          email: updated.email,
+          phone: updated.phone || '',
+          address: updated.address || '',
+          createdAt: updated.createdAt,
+        }));
+        setIsEditing(false);
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Unable to save profile',
+          description: error instanceof Error ? error.message : 'Please try again later.',
+        });
+      }
+    };
+
+    void persistProfile();
   };
+
+  const handlePhotoButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+
+    try {
+      await uploadProfilePhoto(file);
+      const photoBlob = await getProfilePhoto();
+      const nextPhotoUrl = URL.createObjectURL(photoBlob);
+      setPhotoUrl(prev => {
+        if (prev) {
+          URL.revokeObjectURL(prev);
+        }
+        return nextPhotoUrl;
+      });
+      toast({
+        title: 'Profile photo updated',
+        description: 'Your new profile picture has been saved.',
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Unable to update profile photo',
+        description: error instanceof Error ? error.message : 'Please try again later.',
+      });
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRequestMembershipId = async () => {
+    setIsLoadingMembership(true);
+
+    try {
+      const membershipInfo = await getMembershipInfo();
+      setMembershipId(membershipInfo.membershipId);
+      setFormData(prev => ({
+        ...prev,
+        createdAt: membershipInfo.memberSince,
+      }));
+      toast({
+        title: 'Membership ID requested',
+        description: `Your membership ID is ${membershipInfo.membershipId}.`,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Unable to request membership ID',
+        description: error instanceof Error ? error.message : 'Please try again later.',
+      });
+    } finally {
+      setIsLoadingMembership(false);
+    }
+  };
+
+  const memberSince = formData.createdAt
+    ? new Date(formData.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : 'Not available';
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -40,13 +217,47 @@ export default function UserProfile() {
       {/* Profile Card */}
       <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
         {/* Profile Header */}
-        <div className="bg-libsmart-blue/10 p-8 flex items-end gap-4">
-          <div className="w-24 h-24 rounded-full bg-libsmart-blue/20 flex items-center justify-center">
-            <User size={48} className="text-libsmart-blue" />
+        <div className="bg-libsmart-blue/10 p-8 flex items-end gap-4 flex-wrap">
+          <div className="relative">
+            <Avatar className="w-24 h-24 border-4 border-white shadow-sm">
+              <AvatarImage src={photoUrl || undefined} alt={formData.fullName} className="object-cover" />
+              <AvatarFallback className="bg-libsmart-blue/20 text-libsmart-blue text-2xl font-semibold">
+                {formData.fullName
+                  .split(' ')
+                  .map(part => part[0])
+                  .slice(0, 2)
+                  .join('') || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <button
+              type="button"
+              onClick={handlePhotoButtonClick}
+              className="absolute -bottom-1 -right-1 rounded-full bg-libsmart-blue p-2 text-white shadow-lg transition-transform hover:scale-105"
+              aria-label="Change profile picture"
+            >
+              <Camera size={14} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg"
+              onChange={handlePhotoChange}
+              className="hidden"
+            />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold text-black">{formData.fullName}</h2>
             <p className="text-libsmart-slate">@{formData.username}</p>
+            <Button
+              type="button"
+              onClick={handlePhotoButtonClick}
+              disabled={isUploadingPhoto}
+              variant="ghost"
+              className="mt-3 gap-2 px-0 text-libsmart-blue hover:bg-transparent hover:text-libsmart-blue/80"
+            >
+              <Camera size={16} />
+              {isUploadingPhoto ? 'Uploading photo...' : 'Change photo'}
+            </Button>
           </div>
         </div>
 
@@ -169,14 +380,28 @@ export default function UserProfile() {
       {/* Membership Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white border border-libsmart-slate/20 rounded-lg p-6">
-          <p className="text-xs text-libsmart-slate uppercase font-semibold mb-2">Membership ID</p>
-          <p className="text-2xl font-bold text-libsmart-blue mb-4">{formData.membershipId}</p>
+          <div className="flex items-start justify-between gap-4 mb-2">
+            <div>
+              <p className="text-xs text-libsmart-slate uppercase font-semibold mb-2">Membership ID</p>
+              <p className="text-2xl font-bold text-libsmart-blue mb-4">{membershipId || 'Not requested yet'}</p>
+            </div>
+            <Button
+              type="button"
+              onClick={handleRequestMembershipId}
+              disabled={isLoadingMembership}
+              variant="outline"
+              className="gap-2 border-libsmart-slate/20 text-libsmart-blue hover:bg-libsmart-blue/10"
+            >
+              <KeyRound size={16} />
+              {isLoadingMembership ? 'Requesting' : membershipId ? 'Refresh ID' : 'Request ID'}
+            </Button>
+          </div>
           <p className="text-sm text-libsmart-slate">Use this ID for in-library identification</p>
         </div>
         <div className="bg-white border border-libsmart-slate/20 rounded-lg p-6">
           <p className="text-xs text-libsmart-slate uppercase font-semibold mb-2">Member Since</p>
-          <p className="text-2xl font-bold text-libsmart-blue mb-4">{formData.membershipDate}</p>
-          <p className="text-sm text-libsmart-slate">Active member for ~6 months</p>
+          <p className="text-2xl font-bold text-libsmart-blue mb-4">{memberSince}</p>
+          <p className="text-sm text-libsmart-slate">Account created from your real profile record</p>
         </div>
       </div>
 

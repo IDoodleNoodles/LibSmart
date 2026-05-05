@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Eye, Pencil, Trash2, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { dashboardBooks, dashboardBranches, dashboardBranchNetwork, dashboardOverdueBorrowers, dashboardStats, dashboardUsers } from '../lib/mockData';
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'books' | 'users' | 'branches'>('overview');
@@ -9,12 +8,35 @@ export default function Dashboard() {
   const [branchSearch, setBranchSearch] = useState('');
   const [managementSearch, setManagementSearch] = useState('');
 
-  const stats = dashboardStats;
-  const overdueData = dashboardOverdueBorrowers;
-  const branchData = dashboardBranchNetwork;
-  const booksData = dashboardBooks;
-  const usersData = dashboardUsers;
-  const branchesData = dashboardBranches;
+  // Mock data - Replace with API calls in future
+  const stats = [
+    { label: 'Total Books', value: '12,453', change: '+234' },
+    { label: 'Total Members', value: '1,843', change: '+45' },
+    { label: 'Active Loans', value: '2,341', change: '-12' },
+    { label: 'Branches', value: '8', change: '+1' },
+  ];
+  
+  const overdueData = [
+    { id: 'OD-001', userName: 'Alex Johnson', bookTitle: 'The Great Gatsby', daysOverdue: 15 },
+    { id: 'OD-002', userName: 'Maya Smith', bookTitle: 'To Kill a Mockingbird', daysOverdue: 8 },
+  ];
+  
+  const branchData = [
+    { id: 'BR-001', name: 'Downtown Branch', location: 'Main St', status: 'Active' },
+    { id: 'BR-002', name: 'Uptown Branch', location: 'North Ave', status: 'Active' },
+  ];
+  
+  const booksData = [
+    { id: 'BK-001', name: 'The Great Gatsby', type: 'Fiction', language: 'English' },
+  ];
+  
+  const usersData = [
+    { id: 'US-001', name: 'Alex Johnson', email: 'alex@example.com', username: 'alexj' },
+  ];
+  
+  const branchesData = [
+    { id: 'BR-001', name: 'Downtown Branch', contact: '555-0001', location: 'Main St' },
+  ];
 
   const filteredOverdueData = overdueData.filter((row) =>
     [row.id, row.userName, row.bookTitle, row.daysOverdue].join(' ').toLowerCase().includes(overdueSearch.toLowerCase())

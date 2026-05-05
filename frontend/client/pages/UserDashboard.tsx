@@ -3,9 +3,12 @@ import { BookOpen, Clock, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useParams } from 'react-router-dom';
 import { defaultUserName, userBorrowedBooks, userPopularBooks } from '../lib/mockData';
+import { getAuthUser } from '../services/api';
 
 export default function UserDashboard() {
   const { username } = useParams();
+  const authUser = getAuthUser() as { fullName?: string; username?: string } | null;
+  const displayName = authUser?.fullName || username || 'Library Member';
   const browsePath = `/${username ?? defaultUserName}/browse`;
   const myBooksPath = `/${username ?? defaultUserName}/my-books`;
   const borrowedBooks = userBorrowedBooks;
@@ -15,7 +18,7 @@ export default function UserDashboard() {
     <div className="space-y-8">
       {/* Welcome Header */}
       <div>
-        <h1 className="text-3xl font-bold text-black mb-2">Welcome back, Sarah!</h1>
+        <h1 className="text-3xl font-bold text-black mb-2">Welcome back, {displayName}!</h1>
         <p className="text-libsmart-slate">Manage your books and explore our library</p>
       </div>
 
