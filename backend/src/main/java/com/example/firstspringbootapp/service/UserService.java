@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.firstspringbootapp.dto.ApiMessageResponse;
+import com.example.firstspringbootapp.dto.AdminUserCreateRequest;
 import com.example.firstspringbootapp.dto.AuthLoginRequest;
 import com.example.firstspringbootapp.dto.AuthResponse;
 import com.example.firstspringbootapp.dto.ChangePasswordRequest;
@@ -91,6 +92,29 @@ public class UserService {
 		userRepository.save(user);
 
 		return new ApiMessageResponse("Registration successful. User created with default USER role.");
+	}
+
+	public UserProfileResponse createUser(AdminUserCreateRequest request) {
+		String username = normalize(request.username());
+		String email = normalize(request.email());
+
+		if (userRepository.existsByUsernameIgnoreCase(username)) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
+		}
+		if (userRepository.existsByEmailIgnoreCase(email)) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+		}
+
+		User user = new User();
+		user.setUsername(username);
+		user.setEmail(email);
+		user.setFullName(request.fullName().trim());
+		user.setPhone(normalize(request.phone()));
+		user.setAddress(normalize(request.address()));
+		user.setPasswordHash(passwordEncoder.encode(request.password()));
+		user.setRole(request.role() == null ? Role.USER : request.role());
+
+		return toProfileResponse(userRepository.save(user));
 	}
 
 	@Transactional(readOnly = true)
@@ -206,6 +230,12 @@ public class UserService {
 		user.setRole(request.role());
 		User savedUser = userRepository.save(user);
 		return new UserWithMessageResponse("Role updated successfully", toProfileResponse(savedUser));
+	}
+
+	public ApiMessageResponse deleteUser(Long userId) {
+		User user = getUserOrThrow(userId);
+		userRepository.delete(user);
+		return new ApiMessageResponse("User deleted successfully");
 	}
 
 	@Transactional(readOnly = true)

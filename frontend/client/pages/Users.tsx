@@ -153,7 +153,7 @@ export default function Users() {
       {/* Users Table */}
       <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-libsmart-slate/20 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <h2 className="text-lg font-bold text-black">User Accounts</h2>
+          <h2 className="text-lg font-bold text-black whitespace-nowrap">User Accounts</h2>
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
             <div className="relative w-full sm:max-w-sm">
               <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-libsmart-slate/50" />
@@ -171,7 +171,7 @@ export default function Users() {
             </Button>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-libsmart-slate/5 border-b border-libsmart-slate/20">
