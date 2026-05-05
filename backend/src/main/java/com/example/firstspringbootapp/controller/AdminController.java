@@ -2,15 +2,20 @@ package com.example.firstspringbootapp.controller;
 
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.firstspringbootapp.dto.AdminUserCreateRequest;
+import com.example.firstspringbootapp.dto.ApiMessageResponse;
 import com.example.firstspringbootapp.dto.RoleUpdateRequest;
 import com.example.firstspringbootapp.dto.UserProfileResponse;
 import com.example.firstspringbootapp.dto.UserWithMessageResponse;
@@ -34,8 +39,18 @@ public class AdminController {
 		return ResponseEntity.ok(userService.getAllUsers());
 	}
 
+	@PostMapping("/users")
+	public ResponseEntity<UserProfileResponse> createUser(@Valid @RequestBody AdminUserCreateRequest request) {
+		return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(request));
+	}
+
 	@PutMapping("/users/{id}/role")
 	public ResponseEntity<UserWithMessageResponse> updateRole(@PathVariable Long id, @Valid @RequestBody RoleUpdateRequest request) {
 		return ResponseEntity.ok(userService.updateUserRole(id, request));
+	}
+
+	@DeleteMapping("/users/{id}")
+	public ResponseEntity<ApiMessageResponse> deleteUser(@PathVariable Long id) {
+		return ResponseEntity.ok(userService.deleteUser(id));
 	}
 }

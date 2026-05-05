@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Clock, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useParams } from 'react-router-dom';
-import { defaultUserName, userBorrowedBooks, userPopularBooks } from '../lib/mockData';
-import { getAuthUser } from '../services/api';
+import { defaultUserName } from '../lib/mockData';
+import { borrowBook, getAuthUser, getBooks, getMyBorrowings, BorrowingItem, LibraryBook } from '../services/api';
 
 export default function UserDashboard() {
   const { username } = useParams();
@@ -11,35 +11,83 @@ export default function UserDashboard() {
   const displayName = authUser?.fullName || username || 'Library Member';
   const browsePath = `/${username ?? defaultUserName}/browse`;
   const myBooksPath = `/${username ?? defaultUserName}/my-books`;
-  const borrowedBooks = userBorrowedBooks;
-  const popularBooks = userPopularBooks;
+
+  const [borrowings, setBorrowings] = useState<BorrowingItem[]>([]);
+  const [books, setBooks] = useState<LibraryBook[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [borrowingsData, booksData] = await Promise.all([getMyBorrowings(), getBooks()]);
+      setBorrowings(borrowingsData);
+      setBooks(booksData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const currentlyBorrowed = useMemo(
+    () => borrowings.filter((item) => item.status === 'BORROWED' || item.status === 'OVERDUE'),
+    [borrowings]
+  );
+
+  const popularBooks = useMemo(
+    () => [...books].sort((a, b) => b.availableQuantity - a.availableQuantity).slice(0, 3),
+    [books]
+  );
+
+  const handleBorrowNow = async (bookId: number) => {
+    try {
+      await borrowBook(bookId);
+      await loadData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to borrow book');
+    }
+  };
+
+  const activeLoans = currentlyBorrowed.length;
+  const returnedCount = Math.max(borrowings.length - currentlyBorrowed.length, 0);
+  const monthsSinceJoin = 18;
 
   return (
     <div className="space-y-8">
-      {/* Welcome Header */}
       <div>
         <h1 className="text-3xl font-bold text-black mb-2">Welcome back, {displayName}!</h1>
         <p className="text-libsmart-slate">Manage your books and explore our library</p>
       </div>
 
-      {/* Stats Cards */}
+      {isLoading ? (
+        <div className="text-sm text-libsmart-slate">Loading dashboard...</div>
+      ) : error ? (
+        <div className="text-sm text-red-600">{error}</div>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white border border-libsmart-slate/20 rounded-lg p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-sm text-libsmart-slate mb-2">Books Borrowed</p>
-              <p className="text-3xl font-bold text-black">3</p>
+              <p className="text-3xl font-bold text-black">{activeLoans}</p>
             </div>
             <BookOpen size={24} className="text-libsmart-blue" />
           </div>
           <p className="text-xs text-libsmart-slate">Active loans</p>
         </div>
-        
+
         <div className="bg-white border border-libsmart-slate/20 rounded-lg p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-sm text-libsmart-slate mb-2">Books Returned</p>
-              <p className="text-3xl font-bold text-black">27</p>
+              <p className="text-3xl font-bold text-black">{returnedCount}</p>
             </div>
             <Clock size={24} className="text-green-600" />
           </div>
@@ -50,7 +98,7 @@ export default function UserDashboard() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-sm text-libsmart-slate mb-2">Member Since</p>
-              <p className="text-3xl font-bold text-black">18</p>
+              <p className="text-3xl font-bold text-black">{monthsSinceJoin}</p>
             </div>
             <Sparkles size={24} className="text-purple-600" />
           </div>
@@ -58,7 +106,6 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Currently Borrowed Books */}
       <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-libsmart-slate/20 flex items-center justify-between">
           <h2 className="text-lg font-bold text-black">Currently Borrowed Books</h2>
@@ -69,39 +116,38 @@ export default function UserDashboard() {
           </Link>
         </div>
         <div className="space-y-0">
-          {borrowedBooks.map((book) => (
-            <div key={book.id} className="px-6 py-4 border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors last:border-b-0">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-black mb-1">{book.title}</h3>
-                  <p className="text-sm text-libsmart-slate mb-2">{book.author}</p>
-                  <p className="text-xs text-libsmart-slate">Due: {book.dueDate}</p>
-                </div>
-                <div className="text-right ml-4">
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                    book.daysLeft > 7
-                      ? 'bg-green-100 text-green-700'
-                      : book.daysLeft > 3
-                      ? 'bg-yellow-100 text-yellow-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}>
-                    {book.daysLeft} days left
-                  </span>
+          {currentlyBorrowed.length > 0 ? (
+            currentlyBorrowed.map((book) => (
+              <div key={book.id} className="px-6 py-4 border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors last:border-b-0">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-black mb-1">{book.book.title}</h3>
+                    <p className="text-sm text-libsmart-slate mb-2">{book.book.author}</p>
+                    <p className="text-xs text-libsmart-slate">Due: {new Date(book.dueDate).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right ml-4">
+                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                      book.status === 'OVERDUE'
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {book.status === 'OVERDUE' ? 'Overdue' : `${Math.max(0, Math.ceil((new Date(book.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))} days left`}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="px-6 py-8 text-sm text-libsmart-slate">No active loans right now.</div>
+          )}
         </div>
       </div>
 
-      {/* Popular Books */}
       <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-libsmart-slate/20 flex items-center justify-between">
           <h2 className="text-lg font-bold text-black">Popular This Month</h2>
           <Link to={browsePath}>
-            <Button className="gap-2 bg-libsmart-blue hover:bg-libsmart-blue/90">
-              Browse All
-            </Button>
+            <Button className="gap-2 bg-libsmart-blue hover:bg-libsmart-blue/90">Browse All</Button>
           </Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x md:divide-libsmart-slate/20">
@@ -112,14 +158,18 @@ export default function UserDashboard() {
                   <h3 className="font-semibold text-black mb-1">{book.title}</h3>
                   <p className="text-sm text-libsmart-slate mb-1">{book.author}</p>
                   <span className="inline-block px-2 py-1 bg-libsmart-blue/10 text-libsmart-blue text-xs font-medium rounded">
-                    {book.category}
+                    {book.category?.name || 'Uncategorized'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-green-600 font-medium">{book.available}</span>
+                  <span className="text-green-600 font-medium">{book.availableQuantity}</span>
                   <span className="text-libsmart-slate">available</span>
                 </div>
-                <Button className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90">
+                <Button
+                  onClick={() => handleBorrowNow(book.id)}
+                  disabled={book.availableQuantity <= 0}
+                  className="w-full bg-libsmart-blue hover:bg-libsmart-blue/90 disabled:opacity-50"
+                >
                   Borrow Now
                 </Button>
               </div>
@@ -128,7 +178,6 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-libsmart-blue/5 border border-libsmart-blue/20 rounded-lg p-6">
           <div className="flex items-start gap-4">

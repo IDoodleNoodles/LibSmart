@@ -1,71 +1,378 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Pencil, Trash2, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import FormModal from '@/components/Modals/FormModal';
+import ConfirmModal from '@/components/Modals/ConfirmModal';
+import ViewModal from '@/components/Modals/ViewModal';
+import {
+  CatalogCategory,
+  createBook,
+  createBranch,
+  createUser,
+  deleteBook,
+  deleteBranch,
+  deleteUser,
+  getAllBorrowings,
+  getAllUsers,
+  getBooks,
+  getBranches,
+  getCategories,
+  LibraryBook,
+  LibraryBranch,
+  updateBook,
+  updateBranch,
+  updateUserRole,
+  UserProfile,
+  BorrowingItem,
+} from '../services/api';
+
+type BookForm = {
+  title: string;
+  author: string;
+  isbn: string;
+  description: string;
+  categoryId: string;
+  branchId: string;
+  quantity: number;
+};
+
+type BranchForm = {
+  name: string;
+  location: string;
+};
+
+type UserForm = {
+  role: 'ADMIN' | 'USER';
+};
+
+type UserCreateForm = {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  phone: string;
+  address: string;
+  role: 'ADMIN' | 'USER';
+};
+
+const defaultBookForm: BookForm = {
+  title: '',
+  author: '',
+  isbn: '',
+  description: '',
+  categoryId: '',
+  branchId: '',
+  quantity: 1,
+};
+
+const defaultBranchForm: BranchForm = {
+  name: '',
+  location: '',
+};
+
+const defaultUserCreateForm: UserCreateForm = {
+  username: '',
+  email: '',
+  password: '',
+  fullName: '',
+  phone: '',
+  address: '',
+  role: 'USER',
+};
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'books' | 'users' | 'branches'>('overview');
   const [overdueSearch, setOverdueSearch] = useState('');
   const [branchSearch, setBranchSearch] = useState('');
-  const [managementSearch, setManagementSearch] = useState('');
 
-  // Mock data - Replace with API calls in future
-  const stats = [
-    { label: 'Total Books', value: '12,453', change: '+234' },
-    { label: 'Total Members', value: '1,843', change: '+45' },
-    { label: 'Active Loans', value: '2,341', change: '-12' },
-    { label: 'Branches', value: '8', change: '+1' },
-  ];
-  
-  const overdueData = [
-    { id: 'OD-001', userName: 'Alex Johnson', bookTitle: 'The Great Gatsby', daysOverdue: 15 },
-    { id: 'OD-002', userName: 'Maya Smith', bookTitle: 'To Kill a Mockingbird', daysOverdue: 8 },
-  ];
-  
-  const branchData = [
-    { id: 'BR-001', name: 'Downtown Branch', location: 'Main St', status: 'Active' },
-    { id: 'BR-002', name: 'Uptown Branch', location: 'North Ave', status: 'Active' },
-  ];
-  
-  const booksData = [
-    { id: 'BK-001', name: 'The Great Gatsby', type: 'Fiction', language: 'English' },
-  ];
-  
-  const usersData = [
-    { id: 'US-001', name: 'Alex Johnson', email: 'alex@example.com', username: 'alexj' },
-  ];
-  
-  const branchesData = [
-    { id: 'BR-001', name: 'Downtown Branch', contact: '555-0001', location: 'Main St' },
-  ];
+  const [books, setBooks] = useState<LibraryBook[]>([]);
+  const [branches, setBranches] = useState<LibraryBranch[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [borrowings, setBorrowings] = useState<BorrowingItem[]>([]);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredOverdueData = overdueData.filter((row) =>
-    [row.id, row.userName, row.bookTitle, row.daysOverdue].join(' ').toLowerCase().includes(overdueSearch.toLowerCase())
-  );
+  const [isBookModalOpen, setIsBookModalOpen] = useState(false);
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [isUserCreateModalOpen, setIsUserCreateModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedBook, setSelectedBook] = useState<LibraryBook | null>(null);
+  const [selectedBranch, setSelectedBranch] = useState<LibraryBranch | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [formData, setFormData] = useState<BookForm>(defaultBookForm);
+  const [branchFormData, setBranchFormData] = useState<BranchForm>(defaultBranchForm);
+  const [userCreateForm, setUserCreateForm] = useState<UserCreateForm>(defaultUserCreateForm);
+  const [userFormData, setUserFormData] = useState<UserForm>({ role: 'USER' });
 
-  const filteredBranchData = branchData.filter((row) =>
-    [row.id, row.name, row.location, row.status].join(' ').toLowerCase().includes(branchSearch.toLowerCase())
-  );
-
-  const filteredManagementData = (() => {
-    const search = managementSearch.toLowerCase();
-    if (activeTab === 'books') {
-      return booksData.filter((row) => [row.id, row.name, row.type, row.language].join(' ').toLowerCase().includes(search));
+  const loadDashboardData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [booksData, branchesData, usersData, borrowingsData] = await Promise.all([
+        getBooks(),
+        getBranches(),
+        getAllUsers(),
+        getAllBorrowings(),
+      ]);
+      setBooks(booksData);
+      setBranches(branchesData);
+      setUsers(usersData);
+      setBorrowings(borrowingsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
     }
-    if (activeTab === 'users') {
-      return usersData.filter((row) => [row.id, row.name, row.email, row.username].join(' ').toLowerCase().includes(search));
+  };
+
+  const ensureCategoriesLoaded = async () => {
+    if (categories.length > 0) {
+      return;
     }
-    return branchesData.filter((row) => [row.id, row.name, row.contact, row.location].join(' ').toLowerCase().includes(search));
-  })();
+    try {
+      const categoriesData = await getCategories();
+      setCategories(categoriesData);
+    } catch {
+      // Keep form usable even if categories fail to load.
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const stats = useMemo(() => {
+    const totalCopies = books.reduce((sum, book) => sum + book.quantity, 0);
+    const activeLoans = borrowings.filter((borrowing) => borrowing.status === 'BORROWED' || borrowing.status === 'OVERDUE').length;
+    const overdueLoans = borrowings.filter((borrowing) => borrowing.status === 'OVERDUE').length;
+    return [
+      { label: 'Total Books', value: totalCopies.toLocaleString(), change: `${books.length} titles` },
+      { label: 'Total Members', value: users.length.toLocaleString(), change: 'Live users' },
+      { label: 'Active Loans', value: activeLoans.toLocaleString(), change: `${overdueLoans} overdue` },
+      { label: 'Branches', value: branches.length.toLocaleString(), change: 'Live branches' },
+    ];
+  }, [books, users, borrowings, branches]);
+
+  const overdueData = useMemo(() => {
+    return borrowings
+      .filter((borrowing) => borrowing.status === 'OVERDUE')
+      .map((borrowing) => ({
+        id: `OD-${String(borrowing.id).padStart(3, '0')}`,
+        userName: borrowing.username,
+        bookTitle: borrowing.book.title,
+        daysOverdue: Math.max(1, Math.ceil((Date.now() - new Date(borrowing.dueDate).getTime()) / (24 * 60 * 60 * 1000))),
+      }));
+  }, [borrowings]);
+
+  const filteredOverdueData = useMemo(() => {
+    const q = overdueSearch.toLowerCase().trim();
+    if (!q) return overdueData;
+    return overdueData.filter((row) => [row.id, row.userName, row.bookTitle, String(row.daysOverdue)].join(' ').toLowerCase().includes(q));
+  }, [overdueData, overdueSearch]);
+
+  const filteredBranchData = useMemo(() => {
+    const q = branchSearch.toLowerCase().trim();
+    const mapped = branches.map((branch) => ({
+      id: `BR-${String(branch.id).padStart(3, '0')}`,
+      name: branch.name,
+      location: branch.location || '-',
+      status: 'Active',
+      raw: branch,
+    }));
+    if (!q) return mapped;
+    return mapped.filter((row) => [row.id, row.name, row.location, row.status].join(' ').toLowerCase().includes(q));
+  }, [branches, branchSearch]);
+
+
+
+  const openBookModal = async (book?: LibraryBook) => {
+    await ensureCategoriesLoaded();
+    if (book) {
+      setSelectedBook(book);
+      setFormData({
+        title: book.title,
+        author: book.author,
+        isbn: book.isbn || '',
+        description: book.description || '',
+        categoryId: book.category?.id ? String(book.category.id) : '',
+        branchId: book.branch?.id ? String(book.branch.id) : '',
+        quantity: book.quantity,
+      });
+    } else {
+      setSelectedBook(null);
+      setFormData(defaultBookForm);
+    }
+    setIsBookModalOpen(true);
+  };
+
+  const openBranchModal = (branch?: LibraryBranch) => {
+    if (branch) {
+      setSelectedBranch(branch);
+      setBranchFormData({ name: branch.name, location: branch.location || '' });
+    } else {
+      setSelectedBranch(null);
+      setBranchFormData(defaultBranchForm);
+    }
+    setIsBranchModalOpen(true);
+  };
+
+  const openUserModal = (user: UserProfile) => {
+    setSelectedUser(user);
+    setUserFormData({ role: user.role });
+    setIsUserModalOpen(true);
+  };
+
+  const openCreateUserModal = () => {
+    setSelectedUser(null);
+    setUserCreateForm(defaultUserCreateForm);
+    setIsUserCreateModalOpen(true);
+  };
+
+  const openDeleteModal = (item: { kind: 'book' | 'branch'; id: number; label: string }) => {
+    setSelectedBook(item.kind === 'book' ? books.find((book) => book.id === item.id) || null : null);
+    setSelectedBranch(item.kind === 'branch' ? branches.find((branch) => branch.id === item.id) || null : null);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleSaveBook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (selectedBook) {
+        const updatedBook = await updateBook(selectedBook.id, {
+          title: formData.title.trim(),
+          author: formData.author.trim(),
+          isbn: formData.isbn.trim() || undefined,
+          description: formData.description.trim() || undefined,
+          categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
+          branchId: formData.branchId ? Number(formData.branchId) : undefined,
+          quantity: Math.max(0, formData.quantity),
+        });
+        setBooks((prev) => prev.map((book) => (book.id === updatedBook.id ? updatedBook : book)));
+      } else {
+        const createdBook = await createBook({
+          title: formData.title.trim(),
+          author: formData.author.trim(),
+          isbn: formData.isbn.trim() || undefined,
+          description: formData.description.trim() || undefined,
+          categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
+          branchId: formData.branchId ? Number(formData.branchId) : undefined,
+          quantity: Math.max(0, formData.quantity),
+        });
+        setBooks((prev) => [createdBook, ...prev]);
+      }
+      setIsBookModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save book');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveBranch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (selectedBranch) {
+        const updatedBranch = await updateBranch(selectedBranch.id, {
+          name: branchFormData.name.trim(),
+          location: branchFormData.location.trim() || undefined,
+        });
+        setBranches((prev) => prev.map((branch) => (branch.id === updatedBranch.id ? updatedBranch : branch)));
+      } else {
+        const createdBranch = await createBranch({
+          name: branchFormData.name.trim(),
+          location: branchFormData.location.trim() || undefined,
+        });
+        setBranches((prev) => [createdBranch, ...prev]);
+      }
+      setIsBranchModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to save branch');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser) {
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const updatedUser = await updateUserRole(selectedUser.id, userFormData.role);
+      setUsers((prev) => prev.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+      setIsUserModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update user role');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const createdUser = await createUser({
+        username: userCreateForm.username.trim(),
+        email: userCreateForm.email.trim(),
+        password: userCreateForm.password,
+        fullName: userCreateForm.fullName.trim(),
+        phone: userCreateForm.phone.trim() || undefined,
+        address: userCreateForm.address.trim() || undefined,
+        role: userCreateForm.role,
+      });
+      setUsers((prev) => [createdUser, ...prev]);
+      setIsUserCreateModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsSubmitting(true);
+    try {
+      if (selectedBook) {
+        await deleteBook(selectedBook.id);
+        setBooks((prev) => prev.filter((book) => book.id !== selectedBook.id));
+      } else if (selectedBranch) {
+        await deleteBranch(selectedBranch.id);
+        setBranches((prev) => prev.filter((branch) => branch.id !== selectedBranch.id));
+      } else if (selectedUser) {
+        await deleteUser(selectedUser.id);
+        setUsers((prev) => prev.filter((user) => user.id !== selectedUser.id));
+        setBorrowings((prev) => prev.filter((borrowing) => borrowing.userId !== selectedUser.id));
+      }
+      setSelectedBook(null);
+      setSelectedBranch(null);
+      setSelectedUser(null);
+      setIsDeleteModalOpen(false);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete item');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-black mb-2">Dashboard</h1>
         <p className="text-libsmart-slate">Welcome back! Here's your library overview.</p>
       </div>
 
-      {/* Statistics Cards */}
+      {isLoading ? (
+        <div className="text-sm text-libsmart-slate">Loading dashboard...</div>
+      ) : error ? (
+        <div className="text-sm text-red-600">{error}</div>
+      ) : null}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
           <div key={index} className="bg-white border border-libsmart-slate/20 rounded-lg p-6 hover:shadow-lg transition-shadow">
@@ -78,9 +385,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Tables Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Overdue Borrowers */}
         <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-libsmart-slate/20 flex items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-black">Overdue Borrowers</h2>
@@ -106,30 +411,31 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOverdueData.length > 0 ? filteredOverdueData.map((row) => (
-                  <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
-                    <td className="px-6 py-4 text-sm text-black">{row.userName}</td>
-                    <td className="px-6 py-4 text-sm text-black">{row.bookTitle}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                        {row.daysOverdue} days
-                      </span>
-                    </td>
-                  </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-libsmart-slate">
-                        No overdue borrowers match your search.
+                {filteredOverdueData.length > 0 ? (
+                  filteredOverdueData.map((row) => (
+                    <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
+                      <td className="px-6 py-4 text-sm text-black">{row.userName}</td>
+                      <td className="px-6 py-4 text-sm text-black">{row.bookTitle}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+                          {row.daysOverdue} days
+                        </span>
                       </td>
                     </tr>
-                  )}
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-libsmart-slate">
+                      No overdue borrowers found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Branch Network */}
         <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-libsmart-slate/20 flex items-center justify-between gap-4">
             <h2 className="text-lg font-bold text-black">Branch Network</h2>
@@ -151,258 +457,180 @@ export default function Dashboard() {
                   <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">ID</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Name</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Location</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredBranchData.length > 0 ? filteredBranchData.map((row) => (
-                  <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
-                    <td className="px-6 py-4 text-sm text-black">{row.name}</td>
-                    <td className="px-6 py-4 text-sm text-black">{row.location}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        row.status === 'Active'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-libsmart-slate/20 text-libsmart-slate'
-                      }`}>
-                        {row.status}
-                      </span>
-                    </td>
-                  </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-sm text-libsmart-slate">
-                        No branches match your search.
+                {filteredBranchData.length > 0 ? (
+                  filteredBranchData.map((row) => (
+                    <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
+                      <td className="px-6 py-4 text-sm text-black">{row.name}</td>
+                      <td className="px-6 py-4 text-sm text-black">{row.location}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <div className="flex gap-2">
+                          <button onClick={() => openBranchModal(row.raw)} className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue" title="View">
+                            <Eye size={16} />
+                          </button>
+                          <button onClick={() => openBranchModal(row.raw)} className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue" title="Edit">
+                            <Pencil size={16} />
+                          </button>
+                          <button onClick={() => { setSelectedBranch(row.raw); setSelectedBook(null); setIsDeleteModalOpen(true); }} className="p-2 hover:bg-red-100 rounded-lg transition-colors text-libsmart-slate hover:text-red-600" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )}
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8 text-center text-sm text-libsmart-slate">
+                      No branches match your search.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {/* Management Tables */}
-      <div className="space-y-6">
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-libsmart-slate/20">
-          {(['books', 'users', 'branches'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 font-medium transition-colors border-b-2 ${
-                activeTab === tab
-                  ? 'text-libsmart-blue border-libsmart-blue'
-                  : 'text-libsmart-slate border-transparent hover:text-black'
-              }`}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)} Management
-            </button>
-          ))}
+
+
+      <FormModal
+        isOpen={isBookModalOpen}
+        title={selectedBook ? `Edit ${selectedBook.title}` : 'Add New Book'}
+        onClose={() => setIsBookModalOpen(false)}
+        onSubmit={handleSaveBook}
+        submitText={selectedBook ? 'Update Book' : 'Add Book'}
+        isLoading={isSubmitting}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Title *</label>
+            <input value={formData.title} onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Author *</label>
+            <input value={formData.author} onChange={(e) => setFormData((prev) => ({ ...prev, author: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Category</label>
+              <select value={formData.categoryId} onChange={(e) => setFormData((prev) => ({ ...prev, categoryId: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue">
+                <option value="">None</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Branch</label>
+              <select value={formData.branchId} onChange={(e) => setFormData((prev) => ({ ...prev, branchId: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue">
+                <option value="">None</option>
+                {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Quantity</label>
+            <input type="number" min={0} value={formData.quantity} onChange={(e) => setFormData((prev) => ({ ...prev, quantity: parseInt(e.target.value, 10) || 0 }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+          </div>
         </div>
+      </FormModal>
 
-        {/* Books Table */}
-        {activeTab === 'books' && (
-          <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-libsmart-slate/20 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <h2 className="text-lg font-bold text-black">Books</h2>
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <div className="relative w-full sm:max-w-sm">
-                  <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-libsmart-slate/50" />
-                  <input
-                    type="text"
-                    value={managementSearch}
-                    onChange={(e) => setManagementSearch(e.target.value)}
-                    placeholder="Search books"
-                    className="w-full pl-10 pr-4 py-2 border border-libsmart-slate/20 rounded-lg bg-white text-black placeholder-libsmart-slate/50 focus:outline-none focus:ring-2 focus:ring-libsmart-blue focus:border-transparent"
-                  />
-                </div>
-                <Button className="gap-2 bg-libsmart-blue hover:bg-libsmart-blue/90">
-                  <Plus size={18} />
-                  Add Book
-                </Button>
+      <FormModal
+        isOpen={isBranchModalOpen}
+        title={selectedBranch ? `Edit ${selectedBranch.name}` : 'Add New Branch'}
+        onClose={() => setIsBranchModalOpen(false)}
+        onSubmit={handleSaveBranch}
+        submitText={selectedBranch ? 'Update Branch' : 'Add Branch'}
+        isLoading={isSubmitting}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Branch Name *</label>
+            <input value={branchFormData.name} onChange={(e) => setBranchFormData((prev) => ({ ...prev, name: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Location</label>
+            <input value={branchFormData.location} onChange={(e) => setBranchFormData((prev) => ({ ...prev, location: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+          </div>
+        </div>
+      </FormModal>
+
+        <FormModal
+          isOpen={isUserCreateModalOpen}
+          title="Add New User"
+          onClose={() => setIsUserCreateModalOpen(false)}
+          onSubmit={handleCreateUser}
+          submitText="Add User"
+          isLoading={isSubmitting}
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Username *</label>
+              <input value={userCreateForm.username} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, username: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Email *</label>
+              <input type="email" value={userCreateForm.email} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, email: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Full Name *</label>
+              <input value={userCreateForm.fullName} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, fullName: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Password *</label>
+              <input type="password" value={userCreateForm.password} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, password: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Phone</label>
+                <input value={userCreateForm.phone} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, phone: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-black mb-1">Role</label>
+                <select value={userCreateForm.role} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, role: e.target.value as 'ADMIN' | 'USER' }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue">
+                  <option value="USER">USER</option>
+                  <option value="ADMIN">ADMIN</option>
+                </select>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-libsmart-slate/5 border-b border-libsmart-slate/20">
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Language</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredManagementData.length > 0 ? filteredManagementData.map((row) => (
-                    <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.name}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.type}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.language}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex gap-2">
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Eye size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Pencil size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-red-100 rounded-lg transition-colors text-libsmart-slate hover:text-red-600">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-libsmart-slate">
-                        No books match your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Address</label>
+              <input value={userCreateForm.address} onChange={(e) => setUserCreateForm((prev) => ({ ...prev, address: e.target.value }))} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue" />
             </div>
           </div>
-        )}
+        </FormModal>
 
-        {/* Users Table */}
-        {activeTab === 'users' && (
-          <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-libsmart-slate/20 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <h2 className="text-lg font-bold text-black">Users</h2>
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <div className="relative w-full sm:max-w-sm">
-                  <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-libsmart-slate/50" />
-                  <input
-                    type="text"
-                    value={managementSearch}
-                    onChange={(e) => setManagementSearch(e.target.value)}
-                    placeholder="Search users"
-                    className="w-full pl-10 pr-4 py-2 border border-libsmart-slate/20 rounded-lg bg-white text-black placeholder-libsmart-slate/50 focus:outline-none focus:ring-2 focus:ring-libsmart-blue focus:border-transparent"
-                  />
-                </div>
-                <Button className="gap-2 bg-libsmart-blue hover:bg-libsmart-blue/90">
-                  <Plus size={18} />
-                  Add User
-                </Button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-libsmart-slate/5 border-b border-libsmart-slate/20">
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Username</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredManagementData.length > 0 ? filteredManagementData.map((row) => (
-                    <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.name}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.email}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.username}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex gap-2">
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Eye size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Pencil size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-red-100 rounded-lg transition-colors text-libsmart-slate hover:text-red-600">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-libsmart-slate">
-                        No users match your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+      <FormModal
+        isOpen={isUserModalOpen}
+        title={selectedUser ? `Edit ${selectedUser.fullName}` : 'Edit User'}
+        onClose={() => setIsUserModalOpen(false)}
+        onSubmit={handleSaveUser}
+        submitText="Update Role"
+        isLoading={isSubmitting}
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-black mb-1">Role</label>
+            <select value={userFormData.role} onChange={(e) => setUserFormData({ role: e.target.value as 'ADMIN' | 'USER' })} className="w-full px-3 py-2 border border-libsmart-slate/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-libsmart-blue">
+              <option value="USER">USER</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
           </div>
-        )}
+        </div>
+      </FormModal>
 
-        {/* Branches Table */}
-        {activeTab === 'branches' && (
-          <div className="bg-white border border-libsmart-slate/20 rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-libsmart-slate/20 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <h2 className="text-lg font-bold text-black">Branches</h2>
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                <div className="relative w-full sm:max-w-sm">
-                  <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-libsmart-slate/50" />
-                  <input
-                    type="text"
-                    value={managementSearch}
-                    onChange={(e) => setManagementSearch(e.target.value)}
-                    placeholder="Search branches"
-                    className="w-full pl-10 pr-4 py-2 border border-libsmart-slate/20 rounded-lg bg-white text-black placeholder-libsmart-slate/50 focus:outline-none focus:ring-2 focus:ring-libsmart-blue focus:border-transparent"
-                  />
-                </div>
-                <Button className="gap-2 bg-libsmart-blue hover:bg-libsmart-blue/90">
-                  <Plus size={18} />
-                  Add Branch
-                </Button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-libsmart-slate/5 border-b border-libsmart-slate/20">
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Name</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Contact</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Location</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-libsmart-slate uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredManagementData.length > 0 ? filteredManagementData.map((row) => (
-                    <tr key={row.id} className="border-b border-libsmart-slate/10 hover:bg-libsmart-slate/5 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-libsmart-blue">{row.id}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.name}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.contact}</td>
-                      <td className="px-6 py-4 text-sm text-black">{row.location}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <div className="flex gap-2">
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Eye size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-libsmart-slate/10 rounded-lg transition-colors text-libsmart-slate hover:text-libsmart-blue">
-                            <Pencil size={16} />
-                          </button>
-                          <button className="p-2 hover:bg-red-100 rounded-lg transition-colors text-libsmart-slate hover:text-red-600">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-sm text-libsmart-slate">
-                        No branches match your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        title={selectedUser ? 'Delete User' : selectedBook ? 'Delete Book' : 'Delete Branch'}
+        message={`Delete ${selectedUser?.fullName || selectedBook?.title || selectedBranch?.name || 'this item'}? This action cannot be undone.`}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+        confirmText="Delete"
+        isDangerous
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

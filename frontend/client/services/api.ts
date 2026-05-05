@@ -8,6 +8,12 @@ type ApiErrorBody = {
   status?: number;
 };
 
+interface ApiEnvelope<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
 export interface AuthResponse {
   success: boolean;
   message: string;
@@ -137,6 +143,11 @@ const fetchJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promi
   return body as T;
 };
 
+const fetchEnvelopeData = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
+  const envelope = await fetchJson<ApiEnvelope<T>>(input, init);
+  return envelope.data;
+};
+
 export const getAuthHeaders = () => {
   const token = getAuthToken();
   return {
@@ -247,5 +258,223 @@ export const updateUserRole = async (
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify({ role }),
+  });
+};
+
+export const createUser = async (data: {
+  username: string;
+  email: string;
+  password: string;
+  fullName: string;
+  phone?: string;
+  address?: string;
+  role?: 'ADMIN' | 'USER';
+}): Promise<UserProfile> => {
+  return fetchJson<UserProfile>(`${API_BASE_URL}/admin/users`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+};
+
+export const deleteUser = async (userId: number) => {
+  return fetchJson(`${API_BASE_URL}/admin/users/${userId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+};
+
+export interface CatalogCategory {
+  id: number;
+  name: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface LibraryBranch {
+  id: number;
+  name: string;
+  location: string | null;
+  createdAt: string;
+}
+
+export interface LibraryBook {
+  id: number;
+  title: string;
+  author: string;
+  isbn: string | null;
+  description: string | null;
+  quantity: number;
+  availableQuantity: number;
+  status: 'AVAILABLE' | 'UNAVAILABLE';
+  createdAt: string;
+  hasCoverImage: boolean;
+  category: CatalogCategory | null;
+  branch: LibraryBranch | null;
+}
+
+export interface BorrowingItem {
+  id: number;
+  userId: number;
+  username: string;
+  book: {
+    id: number;
+    title: string;
+    author: string;
+    isbn: string | null;
+    coverBase64: string | null;
+    category: CatalogCategory | null;
+    branch: LibraryBranch | null;
+  };
+  borrowDate: string;
+  dueDate: string;
+  returnDate: string | null;
+  status: 'BORROWED' | 'RETURNED' | 'OVERDUE';
+  createdAt: string;
+}
+
+export const getCategories = async (): Promise<CatalogCategory[]> => {
+  return fetchEnvelopeData<CatalogCategory[]>(`${API_BASE_URL}/categories`, {
+    method: 'GET',
+  });
+};
+
+export const createCategory = async (payload: { name: string; description?: string }) => {
+  return fetchEnvelopeData<CatalogCategory>(`${API_BASE_URL}/admin/categories`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateCategory = async (id: number, payload: { name: string; description?: string }) => {
+  return fetchEnvelopeData<CatalogCategory>(`${API_BASE_URL}/admin/categories/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteCategory = async (id: number) => {
+  return fetchEnvelopeData<void>(`${API_BASE_URL}/admin/categories/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const getBranches = async (): Promise<LibraryBranch[]> => {
+  return fetchEnvelopeData<LibraryBranch[]>(`${API_BASE_URL}/branches`, {
+    method: 'GET',
+  });
+};
+
+export const createBranch = async (payload: { name: string; location?: string }) => {
+  return fetchEnvelopeData<LibraryBranch>(`${API_BASE_URL}/admin/branches`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateBranch = async (id: number, payload: { name: string; location?: string }) => {
+  return fetchEnvelopeData<LibraryBranch>(`${API_BASE_URL}/admin/branches/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteBranch = async (id: number) => {
+  return fetchEnvelopeData<void>(`${API_BASE_URL}/admin/branches/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const getBooks = async (params?: {
+  category?: number;
+  branch?: number;
+  status?: 'AVAILABLE' | 'UNAVAILABLE';
+  search?: string;
+}): Promise<LibraryBook[]> => {
+  const query = new URLSearchParams();
+  if (params?.category) query.set('category', String(params.category));
+  if (params?.branch) query.set('branch', String(params.branch));
+  if (params?.status) query.set('status', params.status);
+  if (params?.search) query.set('search', params.search);
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+
+  return fetchEnvelopeData<LibraryBook[]>(`${API_BASE_URL}/books${suffix}`, {
+    method: 'GET',
+  });
+};
+
+export const createBook = async (payload: {
+  title: string;
+  author: string;
+  isbn?: string;
+  description?: string;
+  categoryId?: number;
+  branchId?: number;
+  quantity: number;
+}) => {
+  return fetchEnvelopeData<LibraryBook>(`${API_BASE_URL}/admin/books`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateBook = async (
+  id: number,
+  payload: {
+    title: string;
+    author: string;
+    isbn?: string;
+    description?: string;
+    categoryId?: number;
+    branchId?: number;
+    quantity: number;
+  }
+) => {
+  return fetchEnvelopeData<LibraryBook>(`${API_BASE_URL}/admin/books/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+export const deleteBook = async (id: number) => {
+  return fetchEnvelopeData<void>(`${API_BASE_URL}/admin/books/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const borrowBook = async (bookId: number) => {
+  return fetchEnvelopeData<BorrowingItem>(`${API_BASE_URL}/user/borrow/${bookId}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const returnBook = async (borrowingId: number) => {
+  return fetchEnvelopeData<void>(`${API_BASE_URL}/user/return/${borrowingId}`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const getMyBorrowings = async (): Promise<BorrowingItem[]> => {
+  return fetchEnvelopeData<BorrowingItem[]>(`${API_BASE_URL}/user/my-books`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+};
+
+export const getAllBorrowings = async (): Promise<BorrowingItem[]> => {
+  return fetchEnvelopeData<BorrowingItem[]>(`${API_BASE_URL}/admin/borrowings`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
   });
 };
