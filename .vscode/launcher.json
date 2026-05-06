@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "LibSmart",
+      "request": "launch",
+      "mainClass": "com.example.firstspringbootapp.LibSmartApplication",
+      "projectName": "backend"
+    }
+  ]
+}
