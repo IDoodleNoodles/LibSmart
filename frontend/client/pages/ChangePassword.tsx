@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Check, Lock } from 'lucide-react';
-import { defaultUserName } from '../lib/mockData';
 import { getAuthUser, changePassword } from '../services/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -10,7 +9,7 @@ export default function ChangePassword() {
   const navigate = useNavigate();
   const { username } = useParams();
   const authUser = getAuthUser() as { username?: string } | null;
-  const profilePath = `/${username ?? authUser?.username ?? defaultUserName}/profile`;
+  const profilePath = `/${username ?? authUser?.username ?? 'user'}/profile`;
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',

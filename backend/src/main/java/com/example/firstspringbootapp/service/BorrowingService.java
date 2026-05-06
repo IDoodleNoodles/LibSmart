@@ -3,6 +3,9 @@ package com.example.firstspringbootapp.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +93,13 @@ public class BorrowingService {
 
 	public List<BorrowingResponse> getAllBorrowings() {
 		List<Borrowing> borrowings = borrowingRepository.findAllByOrderByCreatedAtDesc();
+		return borrowings.stream().map(this::toResponse).toList();
+	}
+
+	public List<BorrowingResponse> getAllBorrowingsPaged(int page, int size) {
+		Page<Borrowing> borrowings = borrowingRepository.findAll(
+			PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "createdAt"))
+		);
 		return borrowings.stream().map(this::toResponse).toList();
 	}
 

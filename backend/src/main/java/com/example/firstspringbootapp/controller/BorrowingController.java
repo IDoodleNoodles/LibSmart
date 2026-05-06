@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.firstspringbootapp.dto.ApiResponse;
@@ -55,7 +56,16 @@ public class BorrowingController {
 	}
 
 	@GetMapping("/api/admin/borrowings")
-	public ResponseEntity<ApiResponse<List<BorrowingResponse>>> getAllBorrowings() {
-		return ResponseEntity.ok(ApiResponse.success("Borrowings fetched successfully", borrowingService.getAllBorrowings()));
+	public ResponseEntity<ApiResponse<List<BorrowingResponse>>> getAllBorrowings(
+		@RequestParam(name = "page", required = false) Integer page,
+		@RequestParam(name = "size", required = false) Integer size
+	) {
+		List<BorrowingResponse> data;
+		if (page != null && size != null) {
+			data = borrowingService.getAllBorrowingsPaged(page, size);
+		} else {
+			data = borrowingService.getAllBorrowings();
+		}
+		return ResponseEntity.ok(ApiResponse.success("Borrowings fetched successfully", data));
 	}
 }

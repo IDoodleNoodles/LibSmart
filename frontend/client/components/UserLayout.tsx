@@ -1,7 +1,8 @@
 import React, { ReactNode, useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Search, LogOut, Home, BookOpen, History, User as UserIcon } from 'lucide-react';
-import { getProfile } from '../services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import SkeletonLoader from '@/components/ui/SkeletonLoader';
 
 interface UserLayoutProps {
   children: ReactNode;
@@ -14,26 +15,33 @@ const navItems = [
 
 export default function UserLayout({ children }: UserLayoutProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout, user } = useAuth();
   const { username } = useParams();
-  const [profile, setProfile] = useState({ fullName: 'Loading...', username: username || 'user' });
+  const effectiveUsername = user?.username || username || 'user';
+  const [profileLoaded, setProfileLoaded] = useState(Boolean(user?.fullName));
+  const [profile, setProfile] = useState({ fullName: user?.fullName ?? '', username: effectiveUsername });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await getProfile();
-        setProfile(data);
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (user?.fullName) {
+      setProfile((prev) => ({ ...prev, fullName: user.fullName }));
+      setProfileLoaded(true);
+    }
+  }, [user?.fullName]);
 
-  const basePath = `/${username || profile.username}`;
-  const dashboardPath = `${basePath}/dashboard`;
-  const browsePath = `${basePath}/browse`;
-  const myBooksPath = `${basePath}/my-books`;
-  const profilePath = `${basePath}/profile`;
+  useEffect(() => {
+    if (!user?.username || !username || username === user.username) {
+      return;
+    }
+
+    const nextPath = location.pathname.replace(`/${username}`, `/${user.username}`);
+    navigate(nextPath, { replace: true });
+  }, [location.pathname, navigate, user?.username, username]);
+
+  const dashboardPath = `/${effectiveUsername}`;
+  const browsePath = `/${effectiveUsername}/browse`;
+  const myBooksPath = `/${effectiveUsername}/my-books`;
+  const profilePath = `/${effectiveUsername}/profile`;
   
   const currentTime = new Date();
   const formattedTime = currentTime.toLocaleTimeString('en-US', { 
@@ -114,14 +122,18 @@ export default function UserLayout({ children }: UserLayoutProps) {
         {/* User Profile Section */}
         <div className="p-4 border-t border-libsmart-slate/20">
           <div className="mb-4 pb-4 border-b border-libsmart-slate/20">
-            <p className="font-semibold text-black text-sm">{profile.fullName}</p>
-            <p className="text-xs text-libsmart-slate">Member</p>
+            {profileLoaded ? (
+              <p className="font-semibold text-black text-sm">{profile.fullName}</p>
+            ) : (
+              <SkeletonLoader width={120} height={16} />
+            )}
+            <p className="text-xs text-libsmart-slate">USER</p>
           </div>
           <Link
             to="/welcome"
-            onClick={() => {
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('auth_user');
+            onClick={(event) => {
+              event.preventDefault();
+              logout();
             }}
             className="flex w-full items-center gap-2 rounded-md px-4 py-2.5 text-sm text-libsmart-slate transition-colors hover:bg-libsmart-slate/10 hover:text-libsmart-slate"
           >

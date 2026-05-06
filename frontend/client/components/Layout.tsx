@@ -1,35 +1,33 @@
 import React, { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutGrid, BookOpen, Users, MapPin, LogOut } from 'lucide-react';
-import { getProfile } from '../services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import SkeletonLoader from '@/components/ui/SkeletonLoader';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const navItems = [
-  { label: 'Dashboard', icon: LayoutGrid, path: '/admin/dashboard' },
-  { label: 'Catalog', icon: BookOpen, path: '/admin/catalog' },
-  { label: 'Books', icon: BookOpen, path: '/admin/books' },
-  { label: 'Users', icon: Users, path: '/admin/users' },
-  { label: 'Branches', icon: MapPin, path: '/admin/branches' },
+  { label: 'Dashboard', icon: LayoutGrid, path: '/' },
+  { label: 'Catalog', icon: BookOpen, path: '/catalog' },
+  { label: 'Books', icon: BookOpen, path: '/books' },
+  { label: 'Users', icon: Users, path: '/users' },
+  { label: 'Branches', icon: MapPin, path: '/branches' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const [profile, setProfile] = useState({ fullName: 'Loading...', role: 'ADMIN' });
+  const { logout, user, role } = useAuth();
+  const [profileLoaded, setProfileLoaded] = useState(Boolean(user?.fullName));
+  const [profile, setProfile] = useState({ fullName: user?.fullName ?? '', role: role ?? 'ADMIN' });
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const data = await getProfile();
-        setProfile(data);
-      } catch (error) {
-        console.error('Failed to fetch profile:', error);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (user?.fullName) {
+      setProfile((prev) => ({ ...prev, fullName: user.fullName }));
+      setProfileLoaded(true);
+    }
+  }, [role, user?.fullName]);
 
   const currentTime = new Date();
   const formattedTime = currentTime.toLocaleTimeString('en-US', { 
@@ -83,14 +81,18 @@ export default function Layout({ children }: LayoutProps) {
         {/* User Profile Section */}
         <div className="p-4 border-t border-libsmart-slate/20">
           <div className="mb-4 pb-4 border-b border-libsmart-slate/20">
-            <p className="font-semibold text-black text-sm">{profile.fullName}</p>
+            {profileLoaded ? (
+              <p className="font-semibold text-black text-sm">{profile.fullName}</p>
+            ) : (
+              <SkeletonLoader width={120} height={16} />
+            )}
             <p className="text-xs text-libsmart-slate">{profile.role}</p>
           </div>
           <Link
             to="/welcome"
-            onClick={() => {
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('auth_user');
+            onClick={(event) => {
+              event.preventDefault();
+              logout();
             }}
             className="flex w-full items-center gap-2 rounded-md px-4 py-2.5 text-sm text-libsmart-slate transition-colors hover:bg-libsmart-slate/10 hover:text-libsmart-slate"
           >

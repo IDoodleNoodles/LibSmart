@@ -2,10 +2,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mail, Lock } from 'lucide-react';
-import { login, setAuthToken, setAuthUser } from '@/services/api';
+import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import type { AuthResponse } from '@/services/api';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     identifier: '',
     password: '',
@@ -28,22 +31,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await login({
-        identifier: formData.identifier,
+      const response = await api.post<AuthResponse>('/auth/login', {
+        username: formData.identifier,
         password: formData.password,
       });
 
-      setAuthToken(response.token);
-      setAuthUser(response.user);
+      login(response.token, response.role, response.user.id, response.user.username, response.user.fullName);
 
-      // Redirect based on role
       if (response.role === 'ADMIN') {
-        navigate('/admin/dashboard');
+        navigate('/');
       } else {
-        navigate(`/${response.user.username}/dashboard`);
+        navigate(`/${response.user.username}`);
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setLoading(false);
     }
