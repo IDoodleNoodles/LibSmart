@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Edit2, Save, X, KeyRound, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { defaultUserName } from '../lib/mockData';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getAuthUser, getMembershipInfo, getProfile, getProfilePhoto, updateProfile, uploadProfilePhoto } from '../services/api';
+import { getMembershipInfo, getProfile, getProfilePhoto, updateProfile, uploadProfilePhoto } from '../services/api';
+import { useAuth } from '@/contexts/AuthContext';
+import SkeletonLoader from '@/components/ui/SkeletonLoader';
 import { useToast } from '@/hooks/use-toast';
 
 type ProfileState = {
@@ -18,7 +19,7 @@ type ProfileState = {
 
 export default function UserProfile() {
   const { username } = useParams();
-  const authUser = getAuthUser() as { fullName?: string; username?: string; email?: string; createdAt?: string } | null;
+  const { user: authUser } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -26,13 +27,14 @@ export default function UserProfile() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [membershipId, setMembershipId] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [profileLoaded, setProfileLoaded] = useState<boolean>(false);
   const [formData, setFormData] = useState<ProfileState>({
-    fullName: authUser?.fullName || 'Library Member',
-    username: username ?? authUser?.username ?? defaultUserName,
-    email: authUser?.email || 'member@libsmart.com',
+    fullName: '',
+    username: username ?? authUser?.username ?? '',
+    email: '',
     phone: '',
     address: '',
-    createdAt: authUser?.createdAt ?? null,
+    createdAt: null,
   });
 
   useEffect(() => {
@@ -48,15 +50,16 @@ export default function UserProfile() {
         }
 
         setFormData({
-          fullName: profile.fullName || 'Library Member',
-          username: profile.username || username || defaultUserName,
-          email: profile.email || 'member@libsmart.com',
+          fullName: profile.fullName ?? '',
+          username: profile.username || username || authUser?.username || '',
+          email: profile.email || '',
           phone: profile.phone || '',
           address: profile.address || '',
-          createdAt: profile.createdAt || authUser?.createdAt || null,
+          createdAt: profile.createdAt || null,
         });
+        setProfileLoaded(true);
 
-        if (profile.createdAt) {
+        if (profile.hasProfilePhoto) {
           // keep the current real photo in sync when the page loads
           try {
             const photoBlob = await getProfilePhoto();
@@ -72,14 +75,12 @@ export default function UserProfile() {
         }
       } catch {
         if (!cancelled && authUser) {
-          setFormData({
-            fullName: authUser.fullName || 'Library Member',
-            username: username || authUser.username || defaultUserName,
-            email: authUser.email || 'member@libsmart.com',
-            phone: '',
-            address: '',
-            createdAt: authUser.createdAt || null,
-          });
+          setFormData(prev => ({
+            ...prev,
+            fullName: authUser.fullName ?? prev.fullName,
+            username: username || authUser.username || prev.username,
+          }));
+          setProfileLoaded(Boolean(authUser.fullName));
         }
       }
     };
@@ -92,7 +93,7 @@ export default function UserProfile() {
         URL.revokeObjectURL(currentPhotoUrl);
       }
     };
-  }, [authUser?.createdAt, authUser?.email, authUser?.fullName, authUser?.username, username]);
+  }, [authUser?.fullName, authUser?.username, username]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -221,13 +222,15 @@ export default function UserProfile() {
           <div className="relative">
             <Avatar className="w-24 h-24 border-4 border-white shadow-sm">
               <AvatarImage src={photoUrl || undefined} alt={formData.fullName} className="object-cover" />
-              <AvatarFallback className="bg-libsmart-blue/20 text-libsmart-blue text-2xl font-semibold">
-                {formData.fullName
-                  .split(' ')
-                  .map(part => part[0])
-                  .slice(0, 2)
-                  .join('') || 'U'}
-              </AvatarFallback>
+                <AvatarFallback className="bg-libsmart-blue/20 text-libsmart-blue text-2xl font-semibold">
+                  {profileLoaded && formData.fullName
+                    ? formData.fullName
+                        .split(' ')
+                        .map(part => part[0])
+                        .slice(0, 2)
+                        .join('')
+                    : 'U'}
+                </AvatarFallback>
             </Avatar>
             <button
               type="button"
@@ -246,7 +249,11 @@ export default function UserProfile() {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold text-black">{formData.fullName}</h2>
+            {profileLoaded ? (
+              <h2 className="text-2xl font-bold text-black">{formData.fullName}</h2>
+            ) : (
+              <SkeletonLoader width={220} height={28} className="mb-1" />
+            )}
             <p className="text-libsmart-slate">@{formData.username}</p>
             <Button
               type="button"

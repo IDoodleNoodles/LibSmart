@@ -2,11 +2,13 @@ package com.example.firstspringbootapp.service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +23,9 @@ import com.example.firstspringbootapp.model.BookStatus;
 import com.example.firstspringbootapp.model.BorrowingStatus;
 import com.example.firstspringbootapp.repository.BookRepository;
 import com.example.firstspringbootapp.repository.BorrowingRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @Service
 @Transactional
@@ -61,14 +66,34 @@ public class BookService {
 	}
 
 	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = "books", key = "{#categoryId, #branchId, #status, #search}")
 	public List<BookResponse> getAll(Long categoryId, Long branchId, BookStatus status, String search) {
 		String normalizedSearch = normalizeNullable(search);
-		return bookRepository.findByFilters(categoryId, branchId, status, normalizedSearch).stream()
+		return bookRepository.findAllByOrderByCreatedAtDesc().stream()
+			.filter(book -> categoryId == null || matchesCategory(book, categoryId))
+			.filter(book -> branchId == null || matchesBranch(book, branchId))
+			.filter(book -> status == null || book.getStatus() == status)
+			.filter(book -> normalizedSearch == null || matchesSearch(book, normalizedSearch))
 			.map(this::toResponse)
 			.toList();
 	}
 
 	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = "books", key = "{#categoryId, #branchId, #status, #search, #page, #size}")
+	public List<BookResponse> getAllPaged(Long categoryId, Long branchId, BookStatus status, String search, int page, int size) {
+		String normalizedSearch = normalizeNullable(search);
+		Page<Book> p = bookRepository.findAll(PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "createdAt")));
+		return p.stream()
+			.filter(book -> categoryId == null || matchesCategory(book, categoryId))
+			.filter(book -> branchId == null || matchesBranch(book, branchId))
+			.filter(book -> status == null || book.getStatus() == status)
+			.filter(book -> normalizedSearch == null || matchesSearch(book, normalizedSearch))
+			.map(this::toResponse)
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = "book", key = "#id")
 	public BookResponse getById(Long id) {
 		return toResponse(getBookOrThrow(id));
 	}
@@ -235,5 +260,19 @@ public class BookService {
 		}
 		String trimmed = value.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private boolean matchesCategory(Book book, Long categoryId) {
+		return book.getCategory() != null && Objects.equals(book.getCategory().getId(), categoryId);
+	}
+
+	private boolean matchesBranch(Book book, Long branchId) {
+		return book.getBranch() != null && Objects.equals(book.getBranch().getId(), branchId);
+	}
+
+	private boolean matchesSearch(Book book, String normalizedSearch) {
+		String lowerSearch = normalizedSearch.toLowerCase(Locale.ROOT);
+		return (book.getTitle() != null && book.getTitle().toLowerCase(Locale.ROOT).contains(lowerSearch))
+			|| (book.getAuthor() != null && book.getAuthor().toLowerCase(Locale.ROOT).contains(lowerSearch));
 	}
 }

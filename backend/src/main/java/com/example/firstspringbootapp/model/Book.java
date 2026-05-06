@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Basic;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -22,7 +23,8 @@ import jakarta.persistence.Table;
 	@Index(name = "idx_category_id", columnList = "category_id"),
 	@Index(name = "idx_branch_id", columnList = "branch_id"),
 	@Index(name = "idx_status", columnList = "status"),
-	@Index(name = "idx_created_at", columnList = "created_at")
+	@Index(name = "idx_created_at", columnList = "created_at"),
+	@Index(name = "idx_isbn", columnList = "isbn")
 })
 public class Book {
 
@@ -42,6 +44,7 @@ public class Book {
 	@Column(columnDefinition = "TEXT")
 	private String description;
 
+	@Basic(fetch = FetchType.LAZY)
 	@Lob
 	@Column(name = "cover_image")
 	private byte[] coverImage;

@@ -45,9 +45,16 @@ public class BookController {
 		@RequestParam(name = "category", required = false) Long categoryId,
 		@RequestParam(name = "branch", required = false) Long branchId,
 		@RequestParam(name = "status", required = false) BookStatus status,
-		@RequestParam(name = "search", required = false) String search
+		@RequestParam(name = "search", required = false) String search,
+		@RequestParam(name = "page", required = false) Integer page,
+		@RequestParam(name = "size", required = false) Integer size
 	) {
-		List<BookResponse> data = bookService.getAll(categoryId, branchId, status, search);
+		List<BookResponse> data;
+		if (page != null && size != null) {
+			data = bookService.getAllPaged(categoryId, branchId, status, search, page, size);
+		} else {
+			data = bookService.getAll(categoryId, branchId, status, search);
+		}
 		return ResponseEntity.ok(ApiResponse.success("Books fetched successfully", data));
 	}
 

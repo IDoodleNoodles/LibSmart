@@ -12,6 +12,8 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.CacheControl;
@@ -118,6 +120,7 @@ public class UserService {
 	}
 
 	@Transactional(readOnly = true)
+	@Cacheable(cacheNames = "userProfile", key = "#userId")
 	public UserProfileResponse getProfile(Long userId) {
 		return userRepository.findProfileById(userId)
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -140,6 +143,7 @@ public class UserService {
 		return new MembershipInfoResponse(buildMembershipId(user), user.getCreatedAt(), nextStatus);
 	}
 
+	@CacheEvict(cacheNames = "userProfile", key = "#userId")
 	public UserProfileResponse updateProfile(Long userId, UpdateProfileRequest request) {
 		User user = getUserOrThrow(userId);
 		String newUsername = normalize(request.username());
@@ -186,6 +190,7 @@ public class UserService {
 		}
 	}
 
+	@CacheEvict(cacheNames = "userProfile", key = "#userId")
 	public PhotoUploadResponse uploadProfilePhoto(Long userId, MultipartFile file) {
 		User user = getUserOrThrow(userId);
 		validateImage(file);

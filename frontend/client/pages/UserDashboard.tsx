@@ -1,23 +1,25 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Clock, AlertCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useParams } from 'react-router-dom';
-import { defaultUserName } from '../lib/mockData';
 import { borrowBook, getAuthUser, getBooks, getMyBorrowings, BorrowingItem, LibraryBook } from '../services/api';
+import { defaultUserName } from '../lib/mockData';
+import SkeletonLoader from '@/components/ui/SkeletonLoader';
 
 export default function UserDashboard() {
   const { username } = useParams();
   const authUser = getAuthUser() as { fullName?: string; username?: string } | null;
-  const displayName = authUser?.fullName || username || 'Library Member';
-  const browsePath = `/${username ?? defaultUserName}/browse`;
-  const myBooksPath = `/${username ?? defaultUserName}/my-books`;
+  const displayName = authUser?.fullName || authUser?.username || '';
+  const effectiveUsername = username || authUser?.username || defaultUserName;
+  const browsePath = `/${effectiveUsername}/browse`;
+  const myBooksPath = `/${effectiveUsername}/my-books`;
 
   const [borrowings, setBorrowings] = useState<BorrowingItem[]>([]);
   const [books, setBooks] = useState<LibraryBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -29,11 +31,11 @@ export default function UserDashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    void loadData();
+  }, [loadData]);
 
   const currentlyBorrowed = useMemo(
     () => borrowings.filter((item) => item.status === 'BORROWED' || item.status === 'OVERDUE'),
@@ -61,12 +63,17 @@ export default function UserDashboard() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-black mb-2">Welcome back, {displayName}!</h1>
+        <h1 className="text-3xl font-bold text-black mb-2">
+          Welcome back, {displayName ? displayName : <SkeletonLoader width={180} height={28} className="inline-block align-middle" />}!
+        </h1>
         <p className="text-libsmart-slate">Manage your books and explore our library</p>
       </div>
 
       {isLoading ? (
-        <div className="text-sm text-libsmart-slate">Loading dashboard...</div>
+        <div className="space-y-2">
+          <SkeletonLoader width={220} height={14} />
+          <SkeletonLoader width={180} height={14} />
+        </div>
       ) : error ? (
         <div className="text-sm text-red-600">{error}</div>
       ) : null}

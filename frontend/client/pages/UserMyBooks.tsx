@@ -2,8 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { BorrowingItem, getMyBorrowings, returnBook } from '../services/api';
+import { useParams } from 'react-router-dom';
 
 export default function UserMyBooks() {
+  const { username } = useParams();
   const [borrowings, setBorrowings] = useState<BorrowingItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

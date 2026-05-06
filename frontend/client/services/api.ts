@@ -1,8 +1,5 @@
-const API_BASE_URL = (
-  import.meta.env.NEXT_PUBLIC_API_URL ??
-  import.meta.env.VITE_API_BASE_URL ??
-  'http://localhost:8081/api'
-).replace(/\/$/, '');
+import { API_BASE_URL, authFetch, requestBlob } from '@/lib/api';
+import { getAuth as getStoredAuth, getAuthUser as getStoredAuthUser, getToken } from '@/lib/auth';
 
 type ApiErrorBody = {
   message?: string;
@@ -67,35 +64,9 @@ export interface MembershipInfo {
   memberSince: string;
 }
 
-export const getAuthToken = () => {
-  return localStorage.getItem('auth_token');
-};
+export const getAuthToken = () => getToken();
 
-export const setAuthToken = (token: string) => {
-  localStorage.setItem('auth_token', token);
-};
-
-export const removeAuthToken = () => {
-  localStorage.removeItem('auth_token');
-};
-
-export const setAuthUser = (user: any) => {
-  localStorage.setItem('auth_user', JSON.stringify(user));
-};
-
-export const getAuthUser = () => {
-  const user = localStorage.getItem('auth_user');
-  if (!user) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(user);
-  } catch {
-    localStorage.removeItem('auth_user');
-    return null;
-  }
-};
+export const getAuthUser = () => getStoredAuthUser();
 
 const parseResponseBody = async (response: Response) => {
   const contentType = response.headers.get('content-type') || '';
@@ -130,7 +101,7 @@ const getErrorMessage = (body: unknown, fallback: string) => {
 };
 
 const fetchJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
-  const response = await fetch(input, {
+  const response = await authFetch(input, {
     ...init,
     headers: {
       Accept: 'application/json',
@@ -154,9 +125,11 @@ const fetchEnvelopeData = async <T>(input: RequestInfo | URL, init?: RequestInit
 
 export const getAuthHeaders = () => {
   const token = getAuthToken();
-  return {
+  return token ? {
     'Content-Type': 'application/json',
-    Authorization: token ? `Bearer ${token}` : '',
+    Authorization: `Bearer ${token}`,
+  } : {
+    'Content-Type': 'application/json',
   };
 };
 
@@ -226,25 +199,16 @@ export const uploadProfilePhoto = async (file: File) => {
   return fetchJson(`${API_BASE_URL}/user/photo/upload`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${getAuthToken()}`,
+      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
     },
     body: formData,
   });
 };
 
 export const getProfilePhoto = async (): Promise<Blob> => {
-  const response = await fetch(`${API_BASE_URL}/user/photo`, {
+  return requestBlob(`${API_BASE_URL}/user/photo`, {
     method: 'GET',
-    headers: {
-      Authorization: getAuthToken() ? `Bearer ${getAuthToken()}` : '',
-    },
   });
-
-  if (!response.ok) {
-    throw new Error('Profile photo not found');
-  }
-
-  return response.blob();
 };
 
 export const getAllUsers = async (): Promise<UserProfile[]> => {
